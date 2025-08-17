@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Notion Clock</title>
+<style>
+  :root{
+    --bg:#0b0b0b;          /* page background (match your Notion theme if you want) */
+    --fg:#eaeaea;          /* tick marks & text */
+    --dim:#9aa0a6;         /* minute ticks */
+    --accent:#ffffff;      /* hands */
+  }
+  html,body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    color:var(--fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  }
+  .wrap{
+    height:100%;
+    display:grid;
+    place-items:center;
+  }
+  .clock{
+    width:min(92vmin, 520px);
+    aspect-ratio:1/1;
+    position:relative;
+  }
+  svg{
+    width:100%;
+    height:100%;
+    display:block;
+  }
+
+  /* Center pin */
+  .pin{ fill: var(--accent); }
+
+  /* Hands */
+  .hand{
+    stroke:var(--accent);
+    stroke-linecap:round;
+    transform-box: fill-box;
+    transform-origin: 100px 100px; /* center of viewBox */
+  }
+  .hand.hour{ stroke-width:3.5; }
+  .hand.minute{ stroke-width:3; }
+  .hand.second{ stroke-width:1.6; opacity:.9; }
+
+  /* Ticks */
+  .tick{ stroke:var(--dim); stroke-width:1.5; }
+  .tick.major{ stroke:var(--fg); stroke-width:3; }
+  .tick.quarter{ stroke-width:2.2; }
+
+  /* Digital readout */
+  .readout{
+    position:absolute;
+    left:50%;
+    top:52%;
+    transform:translateX(-50%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    pointer-events:none;
+  }
+  .time{
+    font-weight:600;
+    font-size: clamp(16px, 4.2vmin, 28px);
+    letter-spacing:.5px;
+  }
+  .date{
+    margin-top:.25rem;
+    font-size: clamp(12px, 2.8vmin, 18px);
+    color: var(--dim);
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="clock" aria-label="Clock">
+      <!-- Analog face -->
+      <svg viewBox="0 0 200 200" role="img" aria-label="Analog clock">
+        <!-- tick marks (inserted by JS) -->
+        <g id="ticks"></g>
+
+        <!-- hands (drawn from center outward) -->
+        <line id="hour"   class="hand hour"   x1="100" y1="100" x2="100" y2="55" />
+        <line id="minute" class="hand minute" x1="100" y1="100" x2="100" y2="35" />
+        <line id="second" class="hand second" x1="100" y1="103" x2="100" y2="28" />
+
+        <!-- center pin -->
+        <circle class="pin" cx="100" cy="100" r="2.4"/>
+      </svg>
+
+      <!-- digital readout -->
+      <div class="readout">
+        <div class="time" id="timeText">--:--:--</div>
+        <div class="date" id="dateText">---</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const tickGroup = document.getElementById('ticks');
+
+  // Build 60 ticks (major at 12/3/6/9, medium at each 5-minute mark)
+  for (let i = 0; i < 60; i++) {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    const angle = i * 6; // degrees
+    const is5 = i % 5 === 0;
+    const isQuarter = i % 15 === 0;
+
+    const rOuter = 96;
+    const rInner = isQuarter ? 76 : (is5 ? 84 : 90);
+
+    // Convert polar to cartesian
+    const rad = (angle - 90) * Math.PI / 180;
+    const x1 = 100 + rInner * Math.cos(rad);
+    const y1 = 100 + rInner * Math.sin(rad);
+    const x2 = 100 + rOuter * Math.cos(rad);
+    const y2 = 100 + rOuter * Math.sin(rad);
+
+    line.setAttribute('x1', x1.toFixed(3));
+    line.setAttribute('y1', y1.toFixed(3));
+    line.setAttribute('x2', x2.toFixed(3));
+    line.setAttribute('y2', y2.toFixed(3));
+    line.setAttribute('class', 'tick' + (is5 ? ' major' : '') + (isQuarter ? ' quarter' : ''));
+
+    g.appendChild(line);
+    tickGroup.appendChild(g);
+  }
+
+  const hourHand = document.getElementById('hour');
+  const minuteHand = document.getElementById('minute');
+  const secondHand = document.getElementById('second');
+  const timeText  = document.getElementById('timeText');
+  const dateText  = document.getElementById('dateText');
+
+  const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const monthNames= ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function pad(n){ return n.toString().padStart(2,'0'); }
+
+  function tick(){
+    const now = new Date();
+    const ms = now.getMilliseconds();
+    const s = now.getSeconds() + ms/1000;
+    const m = now.getMinutes() + s/60;
+    const h = (now.getHours()%12) + m/60;
+
+    // Rotate hands (SVG transform rotates around center we set in CSS)
+    hourHand.style.transform   = `rotate(${h*30}deg)`;
+    minuteHand.style.transform = `rotate(${m*6}deg)`;
+    secondHand.style.transform = `rotate(${s*6}deg)`;
+
+    // Digital readout (24h like the screenshot)
+    timeText.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+    // Date like "Sat May 3"
+    dateText.textContent = `${dayNames[now.getDay()]} ${monthNames[now.getMonth()]} ${now.getDate()}`;
+
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+</script>
+</body>
+</html>
