@@ -3,46 +3,49 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Notion Clock (Responsive)</title>
+<title>Notion Clock – Responsive Transparent</title>
 <style>
-  :root{ --bg:#0b0b0b; --fg:#eaeaea; --dim:#9aa0a6; --accent:#ffffff; }
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);
-    font-family: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;}
-  /* Container auto-fits whatever size Notion gives it */
-  .wrap{height:100%;display:grid;place-items:center;padding:0.5rem}
-  .clock{width:100%;max-width:560px;aspect-ratio:1/1}
-  svg{width:100%;height:100%;display:block}
-  /* Strokes are in SVG units, so they scale with the viewBox */
-  .hand{stroke:var(--accent);stroke-linecap:round}
+  :root{
+    --fg:#eaeaea;        /* ticks & text */
+    --dim:#9aa0a6;       /* minute ticks & date */
+    --accent:#ffffff;    /* hands */
+  }
+  html,body{
+    height:100%; margin:0;
+    background:transparent;           /* ← transparent page */
+    color:var(--fg);
+    font-family: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+  }
+  .wrap{height:100%; display:grid; place-items:center}
+  .clock{width:100%; max-width:560px; aspect-ratio:1/1}
+  svg{width:100%; height:100%; display:block; background:transparent} /* ← transparent SVG */
+  .hand{stroke:var(--accent); stroke-linecap:round}
   .hand.hour{stroke-width:4}
   .hand.minute{stroke-width:3}
-  .hand.second{stroke-width:1.6;opacity:.95}
-  .tick{stroke:var(--dim);stroke-width:1.5}
-  .tick.major{stroke:var(--fg);stroke-width:3}
+  .hand.second{stroke-width:1.6; opacity:.95}
+  .tick{stroke:var(--dim); stroke-width:1.5}
+  .tick.major{stroke:var(--fg); stroke-width:3}
   .tick.quarter{stroke-width:2.2}
   .pin{fill:var(--accent)}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="clock" aria-label="Clock">
-    <!-- Everything lives in one scalable SVG -->
+  <div class="clock" id="clock">
     <svg viewBox="0 0 200 200" role="img" aria-label="Analog/Digital clock">
-      <!-- Ticks (built by JS) -->
       <g id="ticks"></g>
 
-      <!-- Hands -->
+      <!-- hands -->
       <line id="hour"   class="hand hour"   x1="100" y1="100" x2="100" y2="65" />
       <line id="minute" class="hand minute" x1="100" y1="100" x2="100" y2="40" />
       <line id="second" class="hand second" x1="100" y1="106" x2="100" y2="28" />
 
-      <!-- Center pin -->
       <circle class="pin" cx="100" cy="100" r="2.6"/>
 
-      <!-- Digital readout INSIDE the SVG so it scales proportionally -->
+      <!-- readout (position & size adjusted by JS for tiny embeds) -->
       <g id="readout" transform="translate(100,122)" text-anchor="middle">
-        <!-- Use font sizes in SVG units so they scale with the viewBox -->
-        <text id="timeText" font-size="12" font-weight="600" fill="var(--fg)" y="0">--:--:-- --</text>
+        <text id="timeText" font-size="12" font-weight="700" fill="var(--fg)" y="0">--:-- --</text>
+        <text id="ampmText" font-size="8"  font-weight="700" fill="var(--fg)" y="0" dx="18">AM</text>
         <text id="dateText" font-size="7.5" fill="var(--dim)" y="12">---</text>
       </g>
     </svg>
@@ -51,64 +54,89 @@
 
 <script>
 (function () {
+  // Build ticks
   const tickGroup = document.getElementById('ticks');
-
-  // Build 60 ticks (major at 5-min intervals; quarters thicker)
-  for (let i = 0; i < 60; i++) {
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    const angle = i * 6;
-    const is5 = i % 5 === 0;
-    const isQuarter = i % 15 === 0;
-
-    const rOuter = 96;
-    const rInner = isQuarter ? 76 : (is5 ? 84 : 90);
-
-    const rad = (angle - 90) * Math.PI / 180;
-    const x1 = 100 + rInner * Math.cos(rad);
-    const y1 = 100 + rInner * Math.sin(rad);
-    const x2 = 100 + rOuter * Math.cos(rad);
-    const y2 = 100 + rOuter * Math.sin(rad);
-
-    line.setAttribute('x1', x1.toFixed(2));
-    line.setAttribute('y1', y1.toFixed(2));
-    line.setAttribute('x2', x2.toFixed(2));
-    line.setAttribute('y2', y2.toFixed(2));
-    line.setAttribute('class', 'tick' + (is5 ? ' major' : '') + (isQuarter ? ' quarter' : ''));
+  for (let i=0;i<60;i++){
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    const angle = i*6, is5=i%5===0, isQuarter=i%15===0;
+    const rOuter=96, rInner=isQuarter?76:(is5?84:90);
+    const rad = (angle-90)*Math.PI/180;
+    const x1=100+rInner*Math.cos(rad), y1=100+rInner*Math.sin(rad);
+    const x2=100+rOuter*Math.cos(rad), y2=100+rOuter*Math.sin(rad);
+    line.setAttribute('x1',x1.toFixed(2)); line.setAttribute('y1',y1.toFixed(2));
+    line.setAttribute('x2',x2.toFixed(2)); line.setAttribute('y2',y2.toFixed(2));
+    line.setAttribute('class','tick'+(is5?' major':'')+(isQuarter?' quarter':''));
     tickGroup.appendChild(line);
   }
 
   const hourHand = document.getElementById('hour');
   const minuteHand = document.getElementById('minute');
   const secondHand = document.getElementById('second');
+  const readout   = document.getElementById('readout');
   const timeText  = document.getElementById('timeText');
+  const ampmText  = document.getElementById('ampmText');
   const dateText  = document.getElementById('dateText');
-
-  const dayNames   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const monthNames= ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const pad = n => String(n).padStart(2,'0');
+  const setRot = (el,deg)=>el.setAttribute('transform',`rotate(${deg} 100 100)`);
 
-  function setRotation(el, deg){
-    el.setAttribute('transform', `rotate(${deg} 100 100)`);
+  // Responsiveness: scale fonts / layout based on pixel width of the container
+  function applyResponsiveLayout(px){
+    // thresholds (tweak if you like)
+    const small = px < 220;
+    const tiny  = px < 160;
+
+    // Move readout lower on small to reduce overlap with hands
+    const y = small ? (tiny ? 136 : 132) : 122;
+    readout.setAttribute('transform', `translate(100,${y})`);
+
+    // Font sizes in SVG units
+    const timeFS = tiny ? 8.8 : (small ? 10.2 : 12);
+    const ampmFS = tiny ? 7.2 : (small ? 7.8 : 8.4);
+    const dateFS = tiny ? 6.2 : (small ? 6.8 : 7.5);
+
+    timeText.setAttribute('font-size', timeFS);
+    ampmText.setAttribute('font-size', ampmFS);
+    dateText.setAttribute('font-size', dateFS);
+
+    // Whether to show seconds at small sizes
+    timeText.dataset.showSeconds = small ? '0' : '1';
+
+    // Nudge AM/PM to sit just to the right of time; spacing scales with size
+    ampmText.setAttribute('dx', (timeFS*1.5).toFixed(1));
   }
 
+  // Observe container size
+  const clockEl = document.getElementById('clock');
+  const ro = new ResizeObserver(entries=>{
+    for(const e of entries){ applyResponsiveLayout(e.contentRect.width); }
+  });
+  ro.observe(clockEl);
+
   function tick(){
-    const now = new Date();
+    const now=new Date();
     const ms = now.getMilliseconds();
-    const s = now.getSeconds() + ms/1000;
-    const m = now.getMinutes() + s/60;
-    const h = (now.getHours()%12) + m/60;
+    const s  = now.getSeconds() + ms/1000;
+    const m  = now.getMinutes() + s/60;
+    const h  = (now.getHours()%12) + m/60;
 
-    // Move hands
-    setRotation(hourHand,   h*30);
-    setRotation(minuteHand, m*6);
-    setRotation(secondHand, s*6);
+    setRot(hourHand,   h*30);
+    setRot(minuteHand, m*6);
+    setRot(secondHand, s*6);
 
-    // 12h with AM/PM
-    let hours = now.getHours();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12; if (hours === 0) hours = 12;
+    // Format time (12h); seconds only if allowed at current size
+    let hours=now.getHours();
+    const ampm = hours>=12?'PM':'AM';
+    hours = hours%12; if(hours===0) hours=12;
 
-    timeText.textContent = `${pad(hours)}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ${ampm}`;
+    const withSeconds = timeText.dataset.showSeconds==='1';
+    const timeStr = withSeconds
+      ? `${pad(hours)}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+      : `${pad(hours)}:${pad(now.getMinutes())}`;
+
+    timeText.textContent = timeStr;
+    ampmText.textContent = ampm;
     dateText.textContent = `${dayNames[now.getDay()]} ${monthNames[now.getMonth()]} ${now.getDate()}`;
 
     requestAnimationFrame(tick);
