@@ -3,15 +3,16 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Notion Clock</title>
+<title>Notion Clock (Responsive)</title>
 <style>
   :root{ --bg:#0b0b0b; --fg:#eaeaea; --dim:#9aa0a6; --accent:#ffffff; }
   html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);
     font-family: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;}
-  .wrap{height:100%;display:grid;place-items:center}
-  .clock{width:min(92vmin,520px);aspect-ratio:1/1;position:relative}
+  /* Container auto-fits whatever size Notion gives it */
+  .wrap{height:100%;display:grid;place-items:center;padding:0.5rem}
+  .clock{width:100%;max-width:560px;aspect-ratio:1/1}
   svg{width:100%;height:100%;display:block}
-  .pin{fill:var(--accent)}
+  /* Strokes are in SVG units, so they scale with the viewBox */
   .hand{stroke:var(--accent);stroke-linecap:round}
   .hand.hour{stroke-width:4}
   .hand.minute{stroke-width:3}
@@ -19,30 +20,32 @@
   .tick{stroke:var(--dim);stroke-width:1.5}
   .tick.major{stroke:var(--fg);stroke-width:3}
   .tick.quarter{stroke-width:2.2}
-  .readout{position:absolute;left:50%;top:52%;transform:translateX(-50%);
-    display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none}
-  .time{font-weight:600;font-size:clamp(16px,4.2vmin,28px);letter-spacing:.5px}
-  .date{margin-top:.25rem;font-size:clamp(12px,2.8vmin,18px);color:var(--dim)}
+  .pin{fill:var(--accent)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="clock" aria-label="Clock">
-    <svg viewBox="0 0 200 200" role="img" aria-label="Analog clock">
+    <!-- Everything lives in one scalable SVG -->
+    <svg viewBox="0 0 200 200" role="img" aria-label="Analog/Digital clock">
+      <!-- Ticks (built by JS) -->
       <g id="ticks"></g>
 
-      <!-- Hands (drawn pointing straight up, rotation is applied via transform attr) -->
+      <!-- Hands -->
       <line id="hour"   class="hand hour"   x1="100" y1="100" x2="100" y2="65" />
       <line id="minute" class="hand minute" x1="100" y1="100" x2="100" y2="40" />
-      <!-- second hand with a short tail so it's visually distinct -->
       <line id="second" class="hand second" x1="100" y1="106" x2="100" y2="28" />
-      <circle class="pin" cx="100" cy="100" r="2.6"/>
-    </svg>
 
-    <div class="readout">
-      <div class="time" id="timeText">--:--:-- --</div>
-      <div class="date" id="dateText">---</div>
-    </div>
+      <!-- Center pin -->
+      <circle class="pin" cx="100" cy="100" r="2.6"/>
+
+      <!-- Digital readout INSIDE the SVG so it scales proportionally -->
+      <g id="readout" transform="translate(100,122)" text-anchor="middle">
+        <!-- Use font sizes in SVG units so they scale with the viewBox -->
+        <text id="timeText" font-size="12" font-weight="600" fill="var(--fg)" y="0">--:--:-- --</text>
+        <text id="dateText" font-size="7.5" fill="var(--dim)" y="12">---</text>
+      </g>
+    </svg>
   </div>
 </div>
 
@@ -50,7 +53,7 @@
 (function () {
   const tickGroup = document.getElementById('ticks');
 
-  // Build ticks
+  // Build 60 ticks (major at 5-min intervals; quarters thicker)
   for (let i = 0; i < 60; i++) {
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     const angle = i * 6;
@@ -82,11 +85,9 @@
 
   const dayNames   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
   const pad = n => String(n).padStart(2,'0');
 
   function setRotation(el, deg){
-    // rotate around center (100,100)
     el.setAttribute('transform', `rotate(${deg} 100 100)`);
   }
 
@@ -98,11 +99,11 @@
     const h = (now.getHours()%12) + m/60;
 
     // Move hands
-    setRotation(hourHand,   h*30);  // 360/12
-    setRotation(minuteHand, m*6);   // 360/60
+    setRotation(hourHand,   h*30);
+    setRotation(minuteHand, m*6);
     setRotation(secondHand, s*6);
 
-    // 12h time with AM/PM
+    // 12h with AM/PM
     let hours = now.getHours();
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12; if (hours === 0) hours = 12;
